@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import ohtu.utils.ValidatorUtils;
 
 public class KirjaDao {
 
@@ -17,7 +18,7 @@ public class KirjaDao {
     }
 
     public boolean lisaaKirja(String kirjoittaja, String otsikko, String kuvaus) throws Exception {
-        if (valid(kirjoittaja, otsikko)) {
+        if (ValidatorUtils.areParametersValid(kirjoittaja, otsikko)) {
             Kirja kirja = new Kirja(kirjoittaja, otsikko, "0", kuvaus);
             Connection conn = DriverManager.getConnection(tietokantaosoite);
             PreparedStatement stmt = conn.prepareStatement("INSERT INTO Kirja(kirjoittaja, otsikko, luettu, kuvaus) "
@@ -42,14 +43,7 @@ public class KirjaDao {
         ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM Kirja");
 
         while (rs.next()) {
-            String id = rs.getString("id");
-            String kirjoittaja = rs.getString("kirjoittaja");
-            String otsikko = rs.getString("otsikko");
-            String onkoLuettu = rs.getString("luettu");
-            String kuvaus = rs.getString("kuvaus");
-
-            Kirja k = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
-            k.setId(id);
+            Kirja k = luoKirja(rs);
 
             kirjat.add(k);
         }
@@ -80,12 +74,15 @@ public class KirjaDao {
         PreparedStatement stmt = conn.prepareStatement("DELETE FROM Kirja WHERE id = ?");
         stmt.setString(1, id);
         stmt.execute();
+        stmt = conn.prepareStatement("DELETE FROM kirjatag WHERE kirja_id = ?");
+        stmt.setString(1, id);
+        stmt.execute();
         stmt.close();
         conn.close();
     }
 
     public boolean muokkaaKirjaa(String id, String kirjoittaja, String otsikko, String kuvaus) throws Exception {
-        if (valid(kirjoittaja, otsikko)) {
+        if (ValidatorUtils.areParametersValid(kirjoittaja, otsikko)) {
             Connection conn = DriverManager.getConnection(tietokantaosoite);
             PreparedStatement stmt = conn.prepareStatement("UPDATE Kirja SET kirjoittaja = ?, otsikko= ?, kuvaus = ? WHERE id = ? ");
             stmt.setString(1, kirjoittaja);
@@ -97,6 +94,7 @@ public class KirjaDao {
             conn.close();
             return true;
         }
+        
         return false;
     }
 
@@ -110,20 +108,6 @@ public class KirjaDao {
         conn.close();
     }
 
-    private boolean valid(String kirjoittaja, String otsikko) {
-        if (kirjoittaja == null || otsikko == null) {
-            return false;
-        }
-
-        if (kirjoittaja.trim().isEmpty()) {
-            return false;
-        } else if (otsikko.trim().isEmpty()) {
-            return false;
-        }
-
-        return true;
-    }
-
     public List<Kirja> haeLuettuStatuksenPerusteella(String luettu) throws Exception {
         List<Kirja> kirjat = new ArrayList();
 
@@ -135,15 +119,7 @@ public class KirjaDao {
 
         while (rs.next()) {
             if (luettu.equals(rs.getString("luettu"))) {
-                String id = rs.getString("id");
-                String kirjoittaja = rs.getString("kirjoittaja");
-                String otsikko = rs.getString("otsikko");
-                String onkoLuettu = rs.getString("luettu");
-                String kuvaus = rs.getString("kuvaus");
-
-                Kirja k = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
-                k.setId(id);
-
+                Kirja k = luoKirja(rs);
                 kirjat.add(k);
             }
         }
@@ -170,13 +146,29 @@ public class KirjaDao {
             String onkoLuettu = rs.getString("luettu");
             String kuvaus = rs.getString("kuvaus");
 
+            boolean loytyiOmistaTiedoista = false;
+
             if ((kirjoittaja != null && kirjoittaja.toLowerCase().contains(haku))
                     || (otsikko != null && otsikko.toLowerCase().contains(haku))
                     || (kuvaus != null && kuvaus.toLowerCase().contains(haku))) {
 
+                loytyiOmistaTiedoista = true;
                 Kirja kirja = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
                 kirja.setId(id);
                 kirjat.add(kirja);
+            }
+
+            if (!loytyiOmistaTiedoista) {
+                List<Tag> tagit = haeTagitKirjanIdnPerusteella(id);
+
+                for (Tag tag : tagit) {
+                    if (tag.getNimi().toLowerCase().contains(haku)) {
+                        Kirja kirja = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
+                        kirja.setId(id);
+                        kirjat.add(kirja);
+                        break;
+                    }
+                }
             }
         }
 
@@ -188,18 +180,33 @@ public class KirjaDao {
     }
 
     public void lisaaTagi(String kirjaId, String tagi) throws Exception {
-
         Connection conn = DriverManager.getConnection(tietokantaosoite);
-        PreparedStatement stmt = conn.prepareStatement("INSERT INTO Tag(nimi) "
-                + "VALUES ( ? )");
+        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM Tag WHERE nimi = ?");
         stmt.setString(1, tagi);
-        stmt.execute();
-        stmt = conn.prepareStatement("INSERT INTO kirjatag (kirja_id, tag_id) "
-                + "VALUES ( ? , (SELECT id FROM Tag ORDER BY id DESC LIMIT 1))");
-        stmt.setString(1, kirjaId);
-        stmt.execute();
-        stmt.close();
-        conn.close();
+        ResultSet rs = stmt.executeQuery();
+
+        if (rs.isBeforeFirst()) {
+            String tagid = rs.getString("id");
+
+            stmt = conn.prepareStatement("INSERT INTO kirjatag (kirja_id, tag_id) "
+                    + "VALUES ( ? , ?)");
+            stmt.setString(1, kirjaId);
+            stmt.setString(2, tagid);
+            stmt.execute();
+            stmt.close();
+            conn.close();
+        } else {
+            stmt = conn.prepareStatement("INSERT INTO Tag(nimi) "
+                    + "VALUES ( ? )");
+            stmt.setString(1, tagi);
+            stmt.execute();
+            stmt = conn.prepareStatement("INSERT INTO kirjatag (kirja_id, tag_id) "
+                    + "VALUES ( ? , (SELECT id FROM Tag ORDER BY id DESC LIMIT 1))");
+            stmt.setString(1, kirjaId);
+            stmt.execute();
+            stmt.close();
+            conn.close();
+        }
 
     }
 
@@ -233,14 +240,7 @@ public class KirjaDao {
         ResultSet rs = stmt.executeQuery();
 
         while (rs.next()) {
-            String id = rs.getString("id");
-            String kirjoittaja = rs.getString("kirjoittaja");
-            String otsikko = rs.getString("otsikko");
-            String onkoLuettu = rs.getString("luettu");
-            String kuvaus = rs.getString("kuvaus");
-
-            Kirja kirja = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
-            kirja.setId(id);
+            Kirja kirja = luoKirja(rs);
             kirjat.add(kirja);
         }
 
@@ -249,5 +249,28 @@ public class KirjaDao {
         conn.close();
 
         return kirjat;
+    }
+
+    public void poistaKirjaltaTagi(String tagiId, String kirjaId) throws SQLException {
+        
+        Connection conn = DriverManager.getConnection(tietokantaosoite);
+        PreparedStatement stmt = conn.prepareStatement("DELETE FROM kirjatag WHERE kirja_id = ? AND tag_id = ?");
+        stmt.setString(1, kirjaId);
+        stmt.setString(2, tagiId);
+        stmt.execute();
+        stmt.close();
+        conn.close();
+    }
+
+    private Kirja luoKirja(ResultSet rs) throws SQLException {
+        String id = rs.getString("id");
+        String kirjoittaja = rs.getString("kirjoittaja");
+        String otsikko = rs.getString("otsikko");
+        String onkoLuettu = rs.getString("luettu");
+        String kuvaus = rs.getString("kuvaus");
+
+        Kirja kirja = new Kirja(kirjoittaja, otsikko, onkoLuettu, kuvaus);
+        kirja.setId(id);
+        return kirja;
     }
 }

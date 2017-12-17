@@ -115,6 +115,15 @@ public class KirjaVinkkiController {
 
     @GetMapping("/{id}/lisaatagi")
     public String lisaaTagi(Model model, @PathVariable String id) throws Exception {
+        return taginLisays(model, id);
+    }
+
+    @GetMapping("/e/{id}/lisaatagi")
+    public String lisaaTagiEtusivulta(Model model, @PathVariable String id) throws Exception {
+        return taginLisays(model, id);
+    }
+
+    private String taginLisays(Model model, String id) {
         try {
             Kirja k = kirjaDao.haeKirja(id);
             model.addAttribute("kirja", k);
@@ -135,6 +144,20 @@ public class KirjaVinkkiController {
             return new RedirectView("/error");
         }
         return new RedirectView("/kirja/" + id + "/info");
+
+    }
+
+    @PostMapping("/e/{id}/lisaa_kirjalle_tagi")
+    @ResponseBody
+    public RedirectView lisaaTagiTietokantaanEtusivulta(@PathVariable String id, @RequestParam(value = "tagi") String tagi) throws Exception {
+
+        Kirja k = kirjaDao.haeKirja(id);
+        try {
+            kirjaDao.lisaaTagi(id, tagi);
+        } catch (Exception ex) {
+            return new RedirectView("/error");
+        }
+        return new RedirectView("/");
 
     }
 
@@ -194,7 +217,7 @@ public class KirjaVinkkiController {
         } catch (Exception ex) {
             return new RedirectView("/error");
         }
-        
+
         if (muokattu) {
             viesti = "Muokattu kirja " + otsikko + " kirjoittajalta " + kirjoittaja + "!";
             return new RedirectView("/");
@@ -207,11 +230,21 @@ public class KirjaVinkkiController {
     @GetMapping("/{id}/onko_luettu")
     public RedirectView merkitseOnkoLuettu(Model model, @PathVariable String id) throws Exception {
         try {
-           muutaOnkoLuettu(id);
+            muutaOnkoLuettu(id);
         } catch (Exception ex) {
             return new RedirectView("/error");
         }
         return new RedirectView("/vinkit");
+    }
+
+    @GetMapping("/tagit/{tagi}/kirja/{kirja}/poista")
+    public RedirectView poistaTagi(@PathVariable String tagi, @PathVariable String kirja) throws Exception {
+        try {
+            kirjaDao.poistaKirjaltaTagi(tagi, kirja);
+        } catch (Exception ex) {
+            return new RedirectView("/error");
+        }
+        return new RedirectView("/kirja/{kirja}/info");
     }
 
     @GetMapping("/e/{id}/onko_luettu")

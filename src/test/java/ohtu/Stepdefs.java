@@ -6,7 +6,6 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import java.io.File;
 import java.util.List;
-import ohtu.controller.KirjaVinkkiController;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.openqa.selenium.By;
@@ -17,7 +16,6 @@ import org.openqa.selenium.firefox.FirefoxDriver;
 public class Stepdefs {
 
     WebDriver driver;
-    KirjaVinkkiController kontrol;
 
     public Stepdefs() {
         File file;
@@ -29,7 +27,15 @@ public class Stepdefs {
         String absolutePath = file.getAbsolutePath();
         System.setProperty("webdriver.gecko.driver", absolutePath);
         this.driver = new FirefoxDriver();
-        kontrol = new KirjaVinkkiController();
+
+    }
+
+    @Given("user has selected Lisaa tagi")
+    public void user_has_selected_Lisaa_tagi() throws Throwable {
+        driver.get("http://localhost:8080");
+        WebElement element = driver.findElement(By.partialLinkText("Lisää tagi"));
+        element.click();
+        Thread.sleep(1000);
 
     }
 
@@ -93,6 +99,7 @@ public class Stepdefs {
     @Given("^user tries to edit a non-existing book$")
     public void edit_non_existing_book() throws Throwable {
         driver.get("http://localhost:8080/99999/muokkaa");
+        Thread.sleep(1000);
     }
 
     @Given("^command merkitseluetuksi is selected$")
@@ -114,6 +121,31 @@ public class Stepdefs {
     @Given("^user goes to the search$")
     public void go_to_search() throws Throwable {
         driver.get("http://localhost:8080/");
+        Thread.sleep(1000);
+    }
+
+    @When("^user select link text to Vinkkikirjasto$")
+    public void user_select_link_text_to_Vinkkikirjasto() throws Throwable {
+        WebElement element = driver.findElement(By.partialLinkText("Vinkkikirjasto"));
+        element.click();
+        Thread.sleep(1000);
+    }
+
+    @When("^button Lisaa tagi is selected$")
+    public void button_Lisaa_tagi_is_selected() throws Throwable {
+        WebElement element = driver.findElement(By.cssSelector("input[type='submit']"));
+        element.click();
+        Thread.sleep(1000);
+    }
+
+    @When("^button Lisaa tagi is selected and user has entered tag \"([^\"]*)\"$")
+    public void button_Lisaa_tagi_is_selected_and_user_has_entered_tag(String tag) throws Throwable {
+        WebElement element = driver.findElement(By.name("tagi"));
+        element.sendKeys(tag);
+        Thread.sleep(1000);
+        element = driver.findElement(By.cssSelector("input[type='submit']"));
+        element.click();
+        Thread.sleep(1000);
     }
 
     @When("^user click element lisaa$")
@@ -193,15 +225,17 @@ public class Stepdefs {
     public void user_has_selected_command_takaisin() throws Throwable {
         WebElement element = driver.findElement(By.linkText("Takaisin"));
         element.click();
+        Thread.sleep(1000);
     }
 
     @When("^page has list of all books and command Takaisin sivulle is selected$")
     public void all_existing_books_are_listed() throws Throwable {
-        pageHasContent("Lisätyt lukuvinkit");
+        pageHasContent("Kirjavinkit");
         WebElement element = driver.findElement(By.id("listId"));
         List<WebElement> kirjaLista = driver.findElements(By.tagName("td"));
         element = driver.findElement(By.linkText("Takaisin pääsivulle"));
         element.click();
+        Thread.sleep(1000);
     }
 
     @When("^user has entered keyword \"([^\"]*)\"$")
@@ -210,6 +244,7 @@ public class Stepdefs {
         element.sendKeys(hakusana);
         element = driver.findElement(By.cssSelector("input[type='submit']"));
         element.click();
+        Thread.sleep(1000);
     }
 
     @When("^user has entered url \"([^\"]*)\" and author \"([^\"]*)\"$")
@@ -245,7 +280,7 @@ public class Stepdefs {
 
     @Then("^user is redirected to listing page$")
     public void user_is_redirected_to_listing_page() throws Throwable {
-        pageHasContent("Lisätyt lukuvinkit");
+        pageHasContent("Kirjavinkit");
     }
 
     @Then("^selected book is deleted$")
@@ -280,6 +315,7 @@ public class Stepdefs {
         Thread.sleep(1000);
         WebElement element = driver.findElement(By.partialLinkText("Lisää kirjavinkki"));
         element = driver.findElement(By.partialLinkText("Näytä kirjavinkit"));
+        Thread.sleep(1000);
     }
 
     @Then("^system sent message sent error message$")
@@ -297,6 +333,7 @@ public class Stepdefs {
         Thread.sleep(1000);
         WebElement element = driver.findElement(By.partialLinkText("Lisää kirjavinkki"));
         element = driver.findElement(By.partialLinkText("Näytä kirjavinkit"));
+        Thread.sleep(1000);
     }
 
     @Then("^the hint is marked as read$")
